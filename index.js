@@ -2,16 +2,16 @@
 // https://github.com/Pickysaurus/vortex-unreal-engine-library/blob/master/example/game-example/index.js
 // https://github.com/Nexus-Mods/Vortex/wiki/MODDINGWIKI-Developers-General-Creating-a-game-extension
 // https://github.com/TanninOne/extension-add-game
+// https://github.com/Nexus-Mods/Vortex/wiki/MODDINGWIKI-Developers-General-Adding-a-load-order-page
 
 // Import some assets from Vortex we'll need.
 const path = require('path');
-const { actions, fs, util } = require('vortex-api');
+const { actions, fs, selectors, util } = require('vortex-api');
 const template = require('string-template');
 
 // Basic Game Information
 const GAME_ID = 'readyornot'; //Nexus Mods ID (the part of the URL before "mods")
 const GAME_NAME = 'Ready Or Not';
-const GAME_SHORTNAME = 'RoN';
 const GAME_ARTWORK = 'gameart.jpg';
 const GAME_CODE_NAME = 'ReadyOrNot';
 const GAME_PLATFORM_NAME = 'Win64';
@@ -46,6 +46,9 @@ const SAVE_EXT = ".sav";
 // Fallback
 const FALLBACK_ID = `${GAME_ID}-fallback`;
 
+// LoadOrder
+const LO_FILE_NAME = 'loadOrder.json';
+
 /*
   Unreal Engine Game Data
   - modsPath: this is where the mod files need to be installed, relative to the game install folder.
@@ -56,6 +59,7 @@ const UNREALDATA = {
     modsPath: path.join(GAME_CODE_NAME, 'Content', 'Paks', '~mods'),
     fileExt: '.pak',
     loadOrder: true,
+    loadOrderPrefixFunc: toLOPrefix,
 }
 
 function main(context) {
@@ -136,26 +140,17 @@ function main(context) {
     context.registerInstaller(`${SAVE_ID}`, 55, testSave, installSave);
     context.registerInstaller(`${FALLBACK_ID}`, 65, testFallback, installFallback);
 
-    // Register load order page if available (TODO: Rework to registerLoadOrder)
+    // Register load order page if available
     if (UNREALDATA.loadOrder === true) {
-        let previousLO;
-        context.registerLoadOrderPage({
+        context.registerLoadOrder({
             gameId: GAME_ID,
-            gameArtURL: path.join(__dirname, GAME_ARTWORK),
-            preSort: (items, direction) => preSort(context.api, items, direction),
-            filter: mods => mods.filter(mod => mod.type === 'ue4-sortable-modtype'),
-            displayCheckboxes: false,
-            callback: (loadOrder) => {
-                if (previousLO === undefined) previousLO = loadOrder;
-                if (loadOrder === previousLO) return;
-                context.api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
-                previousLO = loadOrder;
-            },
-            createInfoPanel: () =>
-                context.api.translate(`Drag and drop the mods on the left to change the order in which they load. {{gameName}} loads mods in alphanumerical order, so Vortex prefixes `
-                    + 'the folder names with "AAA, AAB, AAC, ..." to ensure they load in the order you set here. '
-                    + 'The number in the left column represents the overwrite order. The changes from mods with higher numbers will take priority over other mods which make similar edits.',
-                    { replace: { gameName: GAME_SHORTNAME } }),
+            validate: async () => Promise.resolve(undefined), // no validation needed
+            deserializeLoadOrder: async () => deserialize(context),
+            serializeLoadOrder: async (loadOrder) => serialize(context, loadOrder),
+            toggleableEntries: false,
+            usageInstructions: `Drag and drop the mods on the left to change the order in which they load. RoN loads mods in alphanumerical order, so Vortex prefixes `
+                + 'the folder names with "AAA, AAB, AAC, ..." to ensure they load in the order you set here. '
+                + 'The number in the left column represents the overwrite order. The changes from mods with higher numbers will take priority over other mods which make similar edits.',
         });
     }
 }
@@ -171,25 +166,177 @@ async function prepareForModding(discovery) {
     return fs.ensureDirWritableAsync(path.join(discovery.path, UNREALDATA.modsPath));
 }
 
-async function preSort(api, items, direction) {
-    const mods = util.getSafe(api.store.getState(), ['persistent', 'mods', GAME_ID], {});
-    const fileExt = UNREALDATA.fileExt;
+/* ======================= LOAD ORDER START ======================= */
 
-    const loadOrder = items.map(mod => {
-        const modInfo = mods[mod.id];
-        let name = modInfo ? modInfo.attributes.customFileName ?? modInfo.attributes.logicalFileName ?? modInfo.attributes.name : mod.name;
-        const paks = util.getSafe(modInfo.attributes, ['unrealModFiles'], []);
-        if (paks.length > 1) name = name + ` (${paks.length} ${fileExt} files)`;
+function generateProps(context, profileId) {
+    const api = context.api;
+    const state = api.getState();
+    const profile = (profileId !== undefined)
+        ? selectors.profileById(state, profileId)
+        : selectors.activeProfile(state);
 
-        return {
-            id: mod.id,
-            name,
-            imgUrl: util.getSafe(modInfo, ['attributes', 'pictureUrl'], path.join(__dirname, GAME_ARTWORK))
-        }
-    });
+    if (profile?.gameId !== GAME_ID) {
+        return undefined;
+    }
 
-    return (direction === 'descending') ? Promise.resolve(loadOrder.reverse()) : Promise.resolve(loadOrder);
+    const discovery = util.getSafe(state,
+        ['settings', 'gameMode', 'discovered', GAME_ID], undefined);
+    if (discovery?.path === undefined) {
+        return undefined;
+    }
+
+    const mods = util.getSafe(state, ['persistent', 'mods', GAME_ID], {});
+    return { api, state, profile, mods, discovery };
 }
+
+function makePrefix(input) {
+    let res = '';
+    let rest = input;
+    while (rest > 0) {
+        res = String.fromCharCode(65 + (rest % 25)) + res;
+        rest = Math.floor(rest / 25);
+    }
+    return util.pad(res, 'A', 3);
+}
+
+function toLOPrefix(context, mod) {
+    const props = generateProps(context);
+    if (props === undefined) {
+        return 'ZZZZ-';
+    }
+
+    // Retrieve the load order as stored in Vortex's application state.
+    const loadOrder = util.getSafe(props.state, ['persistent', 'loadOrder', props.profile.id], []);
+
+    // Find the mod entry in the load order state and insert the prefix in front
+    //  of the mod's name/id/whatever
+    const index = loadOrder.findIndex((loEntry) => loEntry.id === mod.id);
+    if (index === -1) {
+        return 'ZZZZ-';
+    }
+    return makePrefix(index) + '-';
+}
+
+async function ensureLOFile(context, profileId, props) {
+    if (props === undefined) {
+        props = generateProps(context, profileId);
+    }
+
+    if (props === undefined) {
+        return Promise.reject(new util.ProcessCanceled('failed to generate game props'));
+    }
+
+    const targetPath = path.join(props.discovery.path, props.profile.id + '_' + LO_FILE_NAME);
+    try {
+        await fs.statAsync(targetPath)
+            .catch({ code: 'ENOENT' }, () => fs.writeFileAsync(targetPath, JSON.stringify([]), { encoding: 'utf8' }));
+        return targetPath;
+    } catch (err) {
+        return Promise.reject(err);
+    }
+}
+
+async function serialize(context, loadOrder) {
+    const props = generateProps(context, undefined);
+    if (props === undefined) {
+        return Promise.reject(new util.ProcessCanceled('invalid props'));
+    }
+
+    // Make sure the LO file is created and ready to be written to.
+    const loFilePath = await ensureLOFile(context, props.profile.id, props);
+    const filteredLO = loadOrder.filter(lo => props.mods?.[lo?.modId]?.type == 'ue4-sortable-modtype');
+
+    // Write the prefixed LO to file.
+    await fs.removeAsync(loFilePath).catch({ code: 'ENOENT' }, () => Promise.resolve());
+    await fs.writeFileAsync(loFilePath, JSON.stringify(filteredLO, null, 4), { encoding: 'utf8' });
+
+    // something has changed so we need to tell vortex that a deployment will be necessary
+    context.api.store.dispatch(actions.setDeploymentNecessary(GAME_ID, true));
+
+    return Promise.resolve();
+}
+
+async function deserialize(context) {
+    // generateProps is a small utility function which returns often re-used objects
+    //  such as the current list of installed Mods, Vortex's application state,
+    //  the currently active profile, etc.
+    const props = generateProps(context, undefined);
+    if (props?.profile?.gameId !== GAME_ID) {
+        // Why are we deserializing when the profile is invalid or belongs to
+        //  another game ?
+        return [];
+    }
+
+    // The deserialization function should be used to filter and insert wanted data into Vortex's
+    //  loadOrder application state, once that's done, Vortex will trigger a serialization event
+    //  which will ensure that the data is written to the LO file.
+    const currentModsState = util.getSafe(props.profile, ['modState'], {});
+
+    // we only want to insert enabled mods.
+    const enabledModIds = Object.keys(currentModsState)
+        .filter(modId => util.getSafe(currentModsState, [modId, 'enabled'], false));
+    const mods = util.getSafe(props.state,
+        ['persistent', 'mods', GAME_ID], {});
+    const loFilePath = await ensureLOFile(context, props.profile.gameId, props);
+    const fileData = await fs.readFileAsync(loFilePath, { encoding: 'utf8' });
+    let data = [];
+    try {
+        try {
+            data = JSON.parse(fileData);
+        } catch (err) {
+            await new Promise((resolve, reject) => {
+                props.api.showDialog('error', 'Corrupt load order file', {
+                    bbcode: props.api.translate('The load order file is in a corrupt state. You can try to fix it yourself '
+                        + 'or Vortex can regenerate the file for you, but that may result in loss of data ' +
+                        '(Will only affect load order items you added manually, if any).')
+                }, [
+                    { label: 'Cancel', action: () => reject(err) },
+                    {
+                        label: 'Regenerate File', action: () => {
+                            data = [];
+                            return resolve();
+                        }
+                    }
+                ])
+            })
+        }
+
+        // User may have disabled/removed a mod - we need to filter out any existing
+        //  entries from the data we parsed.
+        const filteredData = data.filter(entry => enabledModIds.includes(entry.id));
+
+        // Check if the user added any new mods.
+        const diff = enabledModIds.filter(
+            (id) =>
+                ["ue4-sortable-modtype"].includes(
+                    mods[id]?.type,
+                ) && filteredData.find((loEntry) => loEntry.id === id) === undefined,
+        );
+
+        // Add any newly added mods to the bottom of the loadOrder.
+        diff.forEach(missingEntry => {
+            filteredData.push({
+                id: missingEntry,
+                modId: missingEntry,
+                enabled: true,
+                name: mods[missingEntry] !== undefined
+                    ? util.renderModName(mods[missingEntry])
+                    : missingEntry,
+            });
+        });
+
+        // At this point you may have noticed that we're not setting the prefix
+        //  for the newly added mod entries - we could certainly do that here,
+        //  but that would simply be code duplication as we need to assign prefixes
+        //  during serialization anyway (otherwise user drag-drop interactions will
+        //  not be saved)
+        return Promise.resolve(filteredData);
+    } catch (err) {
+        return Promise.reject(err);
+    }
+}
+
+/* ======================= LOAD ORDER END ========================= */
 
 /*
  * mod types can be registered at arbitrary priority, a lower number means
