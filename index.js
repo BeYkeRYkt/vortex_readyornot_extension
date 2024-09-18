@@ -27,9 +27,24 @@ const SHIPPING_EXE_PATH = `${EXEC_PATH}\\${GAME_CODE_NAME}-${GAME_PLATFORM_NAME}
 // Binaries
 const BINARIES_ID = `${GAME_ID}-binaries`;
 
+// FMOD
+const FMOD_ID = `${GAME_ID}-fmod`;
+const FMOD_PATH = path.join(GAME_CODE_NAME, 'Content', 'FMOD', 'Desktop');
+const FMOD_EXT = '.bank';
+
+// Movies
+const MOVIES_ID = `${GAME_ID}-movies`;
+const MOVIES_PATH = path.join(GAME_CODE_NAME, 'Content', 'Movies');
+const MOVIES_EXT = '.mp4';
+
+// VO
+const VO_ID = `${GAME_ID}-vo`;
+const VO_PATH = path.join(GAME_CODE_NAME, 'Content', 'VO');
+const VO_EXT = '.ogg'
+
 // Config
 const CONFIG_ID = `${GAME_ID}-config`;
-const CONFIG_PATH = `${GAME_CODE_NAME}\\Saved\\Config\\Windows`;
+const CONFIG_PATH = path.join(GAME_CODE_NAME, 'Saved', 'Config', 'Windows');
 const CONFIG_EXT = ".ini";
 const CONFIG_FILES = ["engine.ini", "scalability.ini"];
 
@@ -100,6 +115,24 @@ function main(context) {
                 targetPath: `{gamePath}\\${EXEC_PATH}`
             },
             {
+                id: FMOD_ID,
+                name: "FMOD",
+                priority: "high",
+                targetPath: `{gamePath}\\${FMOD_PATH}`
+            },
+            {
+                id: MOVIES_ID,
+                name: "Movies",
+                priority: "high",
+                targetPath: `{gamePath}\\${MOVIES_PATH}`
+            },
+            {
+                id: VO_ID,
+                name: "Voice Over (VO)",
+                priority: "high",
+                targetPath: `{gamePath}\\${VO_PATH}`
+            },
+            {
                 id: CONFIG_ID,
                 name: "Config (LocalAppData)",
                 priority: "high",
@@ -135,9 +168,12 @@ function main(context) {
 
     // Register mod installers
     context.registerInstaller(`${ROOT_ID}`, 35, testRoot, installRoot);
-    context.registerInstaller(`${CONFIG_ID}`, 45, testConfig, installConfig);
-    context.registerInstaller(`${SAVE_ID}`, 55, testSave, installSave);
-    context.registerInstaller(`${FALLBACK_ID}`, 65, testFallback, installFallback);
+    context.registerInstaller(`${FMOD_ID}`, 45, testFmod, installFmod);
+    context.registerInstaller(`${MOVIES_ID}`, 55, testMovies, installMovies);
+    context.registerInstaller(`${VO_ID}`, 65, testVO, installVO);
+    context.registerInstaller(`${CONFIG_ID}`, 75, testConfig, installConfig);
+    context.registerInstaller(`${SAVE_ID}`, 85, testSave, installSave);
+    context.registerInstaller(`${FALLBACK_ID}`, 95, testFallback, installFallback);
 
     // Register load order page if available
     if (UNREALDATA.loadOrder === true) {
@@ -370,6 +406,107 @@ function pathPattern(api, game, pattern) {
     });
 }
 
+//Test for fmod files
+function testFmod(files, gameId) {
+    // Make sure we're able to support this mod
+    const isFMOD = files.find(file => path.extname(file).toLowerCase() === FMOD_EXT) !== undefined;
+    let supported = (gameId === GAME_ID) && isFMOD;
+
+    return Promise.resolve({
+        supported,
+        requiredFiles: [],
+    });
+}
+
+//Install fmod files
+function installFmod(files) {
+    const modFile = files.find(file => path.extname(file).toLowerCase() === FMOD_EXT);
+    const idx = modFile.indexOf(path.basename(modFile));
+    const rootPath = path.dirname(modFile);
+    const setModTypeInstruction = { type: 'setmodtype', value: FMOD_ID };
+
+    // Remove directories and anything that isn't in the rootPath.
+    const filtered = files.filter(file =>
+    ((file.indexOf(rootPath) !== -1) &&
+        (!file.endsWith(path.sep))));
+
+    const instructions = filtered.map(file => {
+        return {
+            type: 'copy',
+            source: file,
+            destination: path.join(file.substr(idx)),
+        };
+    });
+    instructions.push(setModTypeInstruction);
+    return Promise.resolve({ instructions });
+}
+
+//Test for movies files
+function testMovies(files, gameId) {
+    // Make sure we're able to support this mod
+    const isMovie = files.find(file => path.extname(file).toLowerCase() === MOVIES_EXT) !== undefined;
+    let supported = (gameId === GAME_ID) && isMovie;
+
+    return Promise.resolve({
+        supported,
+        requiredFiles: [],
+    });
+}
+
+//Install movies files
+function installMovies(files) {
+    const modFile = files.find(file => path.extname(file).toLowerCase() === MOVIES_EXT);
+    const idx = modFile.indexOf(path.basename(modFile));
+    const rootPath = path.dirname(modFile);
+    const setModTypeInstruction = { type: 'setmodtype', value: MOVIES_ID };
+
+    // Remove directories and anything that isn't in the rootPath.
+    const filtered = files.filter(file =>
+    ((file.indexOf(rootPath) !== -1) &&
+        (!file.endsWith(path.sep))));
+
+    const instructions = filtered.map(file => {
+        return {
+            type: 'copy',
+            source: file,
+            destination: path.join(file.substr(idx)),
+        };
+    });
+    instructions.push(setModTypeInstruction);
+    return Promise.resolve({ instructions });
+}
+
+//Test for VO files
+function testVO(files, gameId) {
+    const isVO = files.find(file => path.extname(file).toLowerCase() === VO_EXT) !== undefined;
+    let supported = (gameId === GAME_ID) && isVO;
+
+    return Promise.resolve({
+        supported,
+        requiredFiles: [],
+    });
+}
+
+//Install VO files
+function installVO(files) {
+    const setModTypeInstruction = { type: 'setmodtype', value: VO_ID };
+
+    // Remove empty directories
+    const filtered = files.filter(file =>
+        (!file.endsWith(path.sep))
+    );
+
+    const instructions = filtered.map(file => {
+        return {
+            type: 'copy',
+            source: file,
+            destination: path.join(file),
+        };
+    });
+    instructions.push(setModTypeInstruction);
+    return Promise.resolve({ instructions });
+}
+
 //Test for config files
 function testConfig(files, gameId) {
     // Make sure we're able to support this mod
@@ -492,6 +629,9 @@ function installSave(files) {
     instructions.push(setModTypeInstruction);
     return Promise.resolve({ instructions });
 }
+
+// DEFAULT MOD FALLBACK
+// Used if a mod cannot be defined
 
 function testFallback(files, gameId) {
     let supported = (gameId === GAME_ID);
