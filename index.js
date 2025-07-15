@@ -18,7 +18,8 @@ const GAME_PLATFORM_NAME = 'Win64';
 
 // Steam Application ID, you can get this from https://steamdb.info/apps/
 const STEAMAPP_ID = '1144200';
-const GAMESTORES = [STEAMAPP_ID];
+const EPICAPP_ID = '07e0052292f44e71a1efeb219d060ea5';
+const GAMESTORES = [STEAMAPP_ID, EPICAPP_ID];
 
 // Exec
 const EXE_PATH = `${GAME_CODE_NAME}.exe`;
@@ -100,11 +101,13 @@ function main(context) {
         ],
         setup: prepareForModding,
         environment: {
-            SteamAPPId: STEAMAPP_ID
+            SteamAPPId: STEAMAPP_ID,
+            EpicAPPId: EPICAPP_ID
         },
         details: {
             unrealEngine: UNREALDATA,
             steamAppId: STEAMAPP_ID,
+            EpicAPPId: EPICAPP_ID,
             customOpenModsPath: UNREALDATA.absModsPath || UNREALDATA.modsPath
         },
         modTypes: [
