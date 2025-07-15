@@ -23,7 +23,6 @@ const GAMESTORES = [STEAMAPP_ID];
 // Exec
 const EXE_PATH = `${GAME_CODE_NAME}.exe`;
 const EXEC_PATH = `${GAME_CODE_NAME}\\Binaries\\${GAME_PLATFORM_NAME}`;
-const SHIPPING_EXE_PATH = `${EXEC_PATH}\\${GAME_CODE_NAME}-${GAME_PLATFORM_NAME}-Shipping.exe`;
 
 // Binaries
 const BINARIES_ID = `${GAME_ID}-binaries`;
@@ -97,8 +96,7 @@ function main(context) {
         logo: GAME_ARTWORK,
         executable: () => EXE_PATH,
         requiredFiles: [
-            EXE_PATH,
-            SHIPPING_EXE_PATH,
+            EXE_PATH
         ],
         setup: prepareForModding,
         environment: {
