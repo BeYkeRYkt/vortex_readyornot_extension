@@ -38,12 +38,6 @@ const MOVIES_ID = `${GAME_ID}-movies`;
 const MOVIES_PATH = path.join(GAME_CODE_NAME, 'Content', 'Movies');
 const MOVIES_EXT = '.mp4';
 
-// VO
-const VO_ID = `${GAME_ID}-vo`;
-const VO_PATH = path.join(GAME_CODE_NAME, 'Content', 'VO');
-const VO_FILE = 'VO';
-const VO_EXT = '.ogg';
-
 // Config
 const CONFIG_ID = `${GAME_ID}-config`;
 const CONFIG_PATH = path.join(GAME_CODE_NAME, 'Saved', 'Config', 'Windows');
@@ -130,12 +124,6 @@ function main(context) {
                 targetPath: `{gamePath}\\${MOVIES_PATH}`
             },
             {
-                id: VO_ID,
-                name: "Voice Over (VO)",
-                priority: "high",
-                targetPath: `{gamePath}\\${VO_PATH}`
-            },
-            {
                 id: CONFIG_ID,
                 name: "Config (LocalAppData)",
                 priority: "high",
@@ -173,10 +161,9 @@ function main(context) {
     context.registerInstaller(`${ROOT_ID}`, 35, testRoot, installRoot);
     context.registerInstaller(`${FMOD_ID}`, 45, testFmod, installFmod);
     context.registerInstaller(`${MOVIES_ID}`, 55, testMovies, installMovies);
-    context.registerInstaller(`${VO_ID}`, 65, testVO, installVO);
-    context.registerInstaller(`${CONFIG_ID}`, 75, testConfig, installConfig);
-    context.registerInstaller(`${SAVE_ID}`, 85, testSave, installSave);
-    context.registerInstaller(`${FALLBACK_ID}`, 95, testFallback, installFallback);
+    context.registerInstaller(`${CONFIG_ID}`, 65, testConfig, installConfig);
+    context.registerInstaller(`${SAVE_ID}`, 75, testSave, installSave);
+    context.registerInstaller(`${FALLBACK_ID}`, 85, testFallback, installFallback);
 
     // Register load order page if available
     if (UNREALDATA.loadOrder === true) {
@@ -467,39 +454,6 @@ function installMovies(files) {
     const filtered = files.filter(file =>
     ((file.indexOf(rootPath) !== -1) &&
         (!file.endsWith(path.sep))));
-
-    const instructions = filtered.map(file => {
-        return {
-            type: 'copy',
-            source: file,
-            destination: path.join(file.substr(idx)),
-        };
-    });
-    instructions.push(setModTypeInstruction);
-    return Promise.resolve({ instructions });
-}
-
-//Test for VO files
-function testVO(files, gameId) {
-    const isVO = files.some(file => path.basename(file) === VO_FILE);
-    let supported = (gameId === GAME_ID) && isVO;
-
-    return Promise.resolve({
-        supported,
-        requiredFiles: [],
-    });
-}
-
-//Install VO files
-function installVO(files) {
-    const modFile = files.find(file => path.basename(file) === VO_FILE);
-    const idx = modFile.indexOf(path.basename(modFile));
-    const setModTypeInstruction = { type: 'setmodtype', value: VO_ID };
-
-    // Remove empty directories
-    const filtered = files.filter(file =>
-        (!file.endsWith(path.sep))
-    );
 
     const instructions = filtered.map(file => {
         return {
