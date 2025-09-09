@@ -8,6 +8,7 @@
 const path = require('path');
 const { actions, fs, selectors, util } = require('vortex-api');
 const template = require('string-template');
+const { get } = require('http');
 
 // Basic Game Information
 const GAME_ID = 'readyornot'; //Nexus Mods ID (the part of the URL before "mods")
@@ -23,6 +24,7 @@ const GAMESTORES = [STEAMAPP_ID, EPICAPP_ID];
 
 // Exec
 const EXE_PATH = `${GAME_CODE_NAME}.exe`;
+const EXE_PATH_EGS = `${GAME_CODE_NAME}EGS.exe`;
 const EXEC_PATH = `${GAME_CODE_NAME}\\Binaries\\${GAME_PLATFORM_NAME}`;
 
 // Binaries
@@ -72,6 +74,25 @@ const UNREALDATA = {
     loadOrderPrefixFunc: toLOPrefix,
 }
 
+//Get correct shipping executable for game version
+function getExecutable(gamePath) {
+  const isCorrectExec = (exec) => {
+    try {
+      fs.statSync(path.join(gamePath, exec));
+      return true;
+    }
+    catch (err) {
+      return false;
+    }
+  };
+  if (isCorrectExec(EXE_PATH)) {
+    return EXE_PATH; 
+  };
+  if (isCorrectExec(EXE_PATH_EGS)) {
+    return EXE_PATH_EGS;
+  };
+}
+
 function main(context) {
 
     context.requireExtension('Unreal Engine Mod Installer');
@@ -89,7 +110,7 @@ function main(context) {
             unrealEngine: true
         },
         logo: GAME_ARTWORK,
-        executable: () => EXE_PATH,
+        executable: getExecutable,
         requiredFiles: [
             EXE_PATH
         ],
