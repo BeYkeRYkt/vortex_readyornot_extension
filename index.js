@@ -23,6 +23,7 @@ const GAMESTORES = [STEAMAPP_ID, EPICAPP_ID];
 
 // Exec
 const EXE_PATH = `${GAME_CODE_NAME}.exe`;
+const EXE_PATH_EGS = `${GAME_CODE_NAME}EGS.exe`;
 const EXEC_PATH = `${GAME_CODE_NAME}\\Binaries\\${GAME_PLATFORM_NAME}`;
 
 // Binaries
@@ -89,7 +90,7 @@ function main(context) {
             unrealEngine: true
         },
         logo: GAME_ARTWORK,
-        executable: () => EXE_PATH,
+        executable: getExecutable,
         requiredFiles: [
             EXE_PATH
         ],
@@ -183,6 +184,25 @@ function main(context) {
 function findGame() {
     return util.GameStoreHelper.findByAppId(GAMESTORES)
         .then(game => game.gamePath);
+}
+
+//Get correct shipping executable for game version
+function getExecutable(discoveryPath) {
+    const isCorrectExec = (exec) => {
+        try {
+            fs.statSync(path.join(discoveryPath, exec));
+            return true;
+        }
+        catch (err) {
+            return false;
+        }
+    };
+
+    if (isCorrectExec(EXE_PATH_EGS)) {
+        return EXE_PATH_EGS;
+    }
+
+    return EXE_PATH;
 }
 
 async function prepareForModding(discovery) {
