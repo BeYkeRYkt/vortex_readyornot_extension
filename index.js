@@ -8,7 +8,6 @@
 const path = require('path');
 const { actions, fs, selectors, util } = require('vortex-api');
 const template = require('string-template');
-const { get } = require('http');
 
 // Basic Game Information
 const GAME_ID = 'readyornot'; //Nexus Mods ID (the part of the URL before "mods")
