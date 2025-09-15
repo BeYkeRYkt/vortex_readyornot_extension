@@ -92,7 +92,7 @@ function main(context) {
         logo: GAME_ARTWORK,
         executable: getExecutable,
         requiredFiles: [
-            EXE_PATH
+            GAME_CODE_NAME
         ],
         setup: prepareForModding,
         environment: {
