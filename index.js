@@ -271,7 +271,7 @@ async function ensureLOFile(context, profileId, props) {
         return Promise.reject(new util.ProcessCanceled('failed to generate game props'));
     }
 
-    const targetPath = path.join(props.discovery.path, props.profile.id + '_' + LO_FILE_NAME);
+    const targetPath = path.join(props.discovery.path, profileId + '_' + LO_FILE_NAME);
     try {
         await fs.statAsync(targetPath)
             .catch({ code: 'ENOENT' }, () => fs.writeFileAsync(targetPath, JSON.stringify([]), { encoding: 'utf8' }));
@@ -322,7 +322,7 @@ async function deserialize(context) {
         .filter(modId => util.getSafe(currentModsState, [modId, 'enabled'], false));
     const mods = util.getSafe(props.state,
         ['persistent', 'mods', GAME_ID], {});
-    const loFilePath = await ensureLOFile(context, props.profile.gameId, props);
+    const loFilePath = await ensureLOFile(context, props.profile.id, props);
     const fileData = await fs.readFileAsync(loFilePath, { encoding: 'utf8' });
     let data = [];
     try {
