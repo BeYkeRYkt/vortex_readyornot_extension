@@ -16,49 +16,24 @@ const GAME_ARTWORK = 'gameart.jpg';
 const GAME_CODE_NAME = 'ReadyOrNot';
 const GAME_PLATFORM_NAME = 'Win64';
 
-// Steam Application ID, you can get this from https://steamdb.info/apps/
-const STEAMAPP_ID = '1144200';
-const EPICAPP_ID = '07e0052292f44e71a1efeb219d060ea5';
-const GAMESTORES = [STEAMAPP_ID, EPICAPP_ID];
-
 // Exec
-const EXE_PATH = `${GAME_CODE_NAME}.exe`;
-const EXE_PATH_EGS = `${GAME_CODE_NAME}EGS.exe`;
 const EXEC_PATH = `${GAME_CODE_NAME}\\Binaries\\${GAME_PLATFORM_NAME}`;
 
-// Binaries
-const BINARIES_ID = `${GAME_ID}-binaries`;
-
-// FMOD
-const FMOD_ID = `${GAME_ID}-fmod`;
-const FMOD_PATH = path.join(GAME_CODE_NAME, 'Content', 'FMOD', 'Desktop');
-const FMOD_EXT = '.bank';
-
-// Movies
-const MOVIES_ID = `${GAME_ID}-movies`;
-const MOVIES_PATH = path.join(GAME_CODE_NAME, 'Content', 'Movies');
-const MOVIES_EXT = '.mp4';
-
-// Config
-const CONFIG_ID = `${GAME_ID}-config`;
-const CONFIG_PATH = path.join(GAME_CODE_NAME, 'Saved', 'Config', 'Windows');
-const CONFIG_EXT = ".ini";
-const CONFIG_FILES = ["engine.ini", "scalability.ini"];
-
-// Root
-const ROOT_ID = `${GAME_ID}-root`;
-const ROOT_FILE = GAME_CODE_NAME;
-
-// Save
-const SAVE_ID = `${GAME_ID}-save`;
-const SAVE_PATH = path.join(GAME_CODE_NAME, 'Saved', 'SaveGames');
-const SAVE_EXT = ".sav";
-
-// Fallback
-const FALLBACK_ID = `${GAME_ID}-fallback`;
-
-// LoadOrder
-const LO_FILE_NAME = 'loadOrder.json';
+// GameStores
+const GAMESTORES = {
+    STEAM: {
+        // Steam Application ID, you can get this from https://steamdb.info/apps/
+        APP_ID: '1144200',
+        EXE_PATH: `${GAME_CODE_NAME}.exe`,
+        SHIPPING_EXE_PATH: `${EXEC_PATH}\\${GAME_CODE_NAME}Steam-${GAME_PLATFORM_NAME}-Shipping.exe`
+    },
+    EPIC: {
+        // Epic Application ID, you can get this from https://egdata.app/
+        APP_ID: '07e0052292f44e71a1efeb219d060ea5',
+        EXE_PATH: `${GAME_CODE_NAME}EGS.exe`,
+        SHIPPING_EXE_PATH: `${EXEC_PATH}\\${GAME_CODE_NAME}EGS-${GAME_PLATFORM_NAME}-Shipping.exe`
+    }
+}
 
 /*
   Unreal Engine Game Data
@@ -70,8 +45,73 @@ const UNREALDATA = {
     modsPath: path.join(GAME_CODE_NAME, 'Content', 'Paks', '~mods'),
     fileExt: '.pak',
     loadOrder: true,
-    loadOrderPrefixFunc: toLOPrefix,
+    loadOrderPrefixFunc: toLOPrefix
 }
+
+const MODTYPES = {
+    ROOT: {
+        id: `${GAME_ID}-root`,
+        name: "Root Game Folder",
+        modTypePriority: "high",
+        installerOrderPriority: 35,
+        installTargetPath: `{gamePath}`,
+        testFunc: testRoot,
+        installFunc: installRoot
+    },
+    FMOD: {
+        id: `${GAME_ID}-fmod`,
+        name: "FMOD",
+        modTypePriority: "high",
+        installerOrderPriority: 45,
+        installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content', 'FMOD', 'Desktop')}`,
+        fileExt: ['.bank'],
+        testFunc: testFmod,
+        installFunc: installFmod
+    },
+    MOVIES: {
+        id: `${GAME_ID}-movies`,
+        name: "Movies",
+        modTypePriority: "high",
+        installerOrderPriority: 55,
+        installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content', 'Movies')}`,
+        fileExt: ['.mp4'],
+        testFunc: testMovies,
+        installFunc: installMovies
+    },
+    CONFIG: {
+        id: `${GAME_ID}-config`,
+        name: "Config (LocalAppData)",
+        modTypePriority: "high",
+        installerOrderPriority: 65,
+        installTargetPath: `{localAppData}\\${path.join(GAME_CODE_NAME, 'Saved', 'Config', 'Windows')}`,
+        fileExt: ['.ini'],
+        files: ["engine.ini", "scalability.ini"],
+        testFunc: testConfig,
+        installFunc: installConfig
+    },
+    SAVE: {
+        id: `${GAME_ID}-save`,
+        name: "Save Game",
+        modTypePriority: "high",
+        installerOrderPriority: 75,
+        fileExt: ['.sav'],
+        installTargetPath: `{localAppData}\\${path.join(GAME_CODE_NAME, 'Saved', 'SaveGames')}`,
+        testFunc: testSave,
+        installFunc: installSave
+    },
+    BINARIES: {
+        id: `${GAME_ID}-binaries`,
+        name: "Binaries",
+        modTypePriority: "high",
+        installerOrderPriority: 85,
+        installTargetPath: `{gamePath}\\${EXEC_PATH}`,
+        testFunc: testBinaries,
+        installFunc: installBinaries
+    }
+}
+
+// LoadOrder
+const LO_FILE_NAME = 'loadOrder.json';
 
 function main(context) {
 
@@ -94,77 +134,34 @@ function main(context) {
         requiredFiles: [
             `${GAME_CODE_NAME}\\Content`
         ],
-        setup: prepareForModding,
+        setup: (discovery) => prepareForModding(discovery, context.api),
         environment: {
-            SteamAPPId: STEAMAPP_ID,
-            EpicAPPId: EPICAPP_ID
+            SteamAPPId: GAMESTORES.STEAM.APP_ID,
+            EpicAPPId: GAMESTORES.EPIC.APP_ID
         },
         details: {
             unrealEngine: UNREALDATA,
-            steamAppId: STEAMAPP_ID,
-            EpicAPPId: EPICAPP_ID,
+            steamAppId: GAMESTORES.STEAM.APP_ID,
+            EpicAPPId: GAMESTORES.EPIC.APP_ID,
             customOpenModsPath: UNREALDATA.absModsPath || UNREALDATA.modsPath
-        },
-        modTypes: [
-            {
-                id: BINARIES_ID,
-                name: "Binaries",
-                priority: "high",
-                targetPath: `{gamePath}\\${EXEC_PATH}`
-            },
-            {
-                id: FMOD_ID,
-                name: "FMOD",
-                priority: "high",
-                targetPath: `{gamePath}\\${FMOD_PATH}`
-            },
-            {
-                id: MOVIES_ID,
-                name: "Movies",
-                priority: "high",
-                targetPath: `{gamePath}\\${MOVIES_PATH}`
-            },
-            {
-                id: CONFIG_ID,
-                name: "Config (LocalAppData)",
-                priority: "high",
-                targetPath: `{localAppData}\\${CONFIG_PATH}`
-            },
-            {
-                id: SAVE_ID,
-                name: "Save Game",
-                priority: "high",
-                targetPath: `{localAppData}\\${SAVE_PATH}`
-            },
-            {
-                id: ROOT_ID,
-                name: "Root Game Folder",
-                priority: "high",
-                targetPath: "{gamePath}"
-            }
-        ]
+        }
     }
 
     // Register game
     context.registerGame(game);
 
-    // Register mod types
-    const modTypes = util.getSafe(game, ['modTypes'], []);
+    const modTypes = Object.values(MODTYPES);
     modTypes.forEach((type, idx) => {
-        context.registerModType(type.id, modTypePriority(type.priority) + idx, (gameId) => {
+        // Register mod types
+        context.registerModType(type.id, modTypePriority(type.modTypePriority) + idx, (gameId) => {
             var _a;
             return (gameId === GAME_ID)
                 && !!((_a = context.api.getState().settings.gameMode.discovered[gameId]) === null || _a === void 0 ? void 0 : _a.path);
-        }, (game) => pathPattern(context.api, game, type.targetPath), () => Promise.resolve(false), { name: type.name });
-    });
+        }, (game) => pathPattern(context.api, game, type.installTargetPath), () => Promise.resolve(false), { name: type.name });
 
-    // Register mod installers
-    context.registerInstaller(`${ROOT_ID}`, 35, testRoot, installRoot);
-    context.registerInstaller(`${FMOD_ID}`, 45, testFmod, installFmod);
-    context.registerInstaller(`${MOVIES_ID}`, 55, testMovies, installMovies);
-    context.registerInstaller(`${CONFIG_ID}`, 65, testConfig, installConfig);
-    context.registerInstaller(`${SAVE_ID}`, 75, testSave, installSave);
-    context.registerInstaller(`${FALLBACK_ID}`, 85, testFallback, installFallback);
+        // Register mod installers
+        context.registerInstaller(type.id, type.installerOrderPriority, type.testFunc, type.installFunc);
+    });
 
     // Register load order page if available
     if (UNREALDATA.loadOrder === true) {
@@ -182,11 +179,14 @@ function main(context) {
 }
 
 function findGame() {
-    return util.GameStoreHelper.findByAppId(GAMESTORES)
+    const appIds = Object.values(GAMESTORES)
+        .map(store => store.APP_ID)
+        .filter(id => id && id.length > 0);
+    return util.GameStoreHelper.findByAppId(appIds)
         .then(game => game.gamePath);
 }
 
-//Get correct shipping executable for game version
+// Get correct shipping executable for game version
 function getExecutable(discoveryPath) {
     const isCorrectExec = (exec) => {
         try {
@@ -197,17 +197,21 @@ function getExecutable(discoveryPath) {
             return false;
         }
     };
-
-    if (isCorrectExec(EXE_PATH_EGS)) {
-        return EXE_PATH_EGS;
-    }
-
-    return EXE_PATH;
+    let exe_path = GAMESTORES.STEAM.EXE_PATH; // Use steam exe path for default
+    const exePaths = Object.values(GAMESTORES).map(store => store.EXE_PATH);
+    for (const p of exePaths) {
+        if (isCorrectExec(p)) {
+            exe_path = p;
+            break;
+        }
+    };
+    return exe_path;
 }
 
-async function prepareForModding(discovery) {
-    await fs.ensureDirWritableAsync(path.join(process.env['LOCALAPPDATA'], CONFIG_PATH));
-    await fs.ensureDirWritableAsync(path.join(process.env['LOCALAPPDATA'], SAVE_PATH));
+async function prepareForModding(discovery, api) {
+    const game = { id: GAME_ID };
+    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.CONFIG.installTargetPath));
+    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.SAVE.installTargetPath));
     return fs.ensureDirWritableAsync(path.join(discovery.path, UNREALDATA.modsPath));
 }
 
@@ -419,7 +423,8 @@ function pathPattern(api, game, pattern) {
 //Test for fmod files
 function testFmod(files, gameId) {
     // Make sure we're able to support this mod
-    const isFMOD = files.find(file => path.extname(file).toLowerCase() === FMOD_EXT) !== undefined;
+    const fileExt = util.getSafe(MODTYPES.FMOD, ['fileExt'], ['.bank']);
+    const isFMOD = files.some(file => fileExt.includes(path.extname(file).toLowerCase()));
     let supported = (gameId === GAME_ID) && isFMOD;
 
     return Promise.resolve({
@@ -430,10 +435,11 @@ function testFmod(files, gameId) {
 
 //Install fmod files
 function installFmod(files) {
-    const modFile = files.find(file => path.extname(file).toLowerCase() === FMOD_EXT);
+    const fileExt = util.getSafe(MODTYPES.FMOD, ['fileExt'], ['.bank']);
+    const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
     const idx = modFile.indexOf(path.basename(modFile));
     const rootPath = path.dirname(modFile);
-    const setModTypeInstruction = { type: 'setmodtype', value: FMOD_ID };
+    const setModTypeInstruction = { type: 'setmodtype', value: MODTYPES.FMOD.id };
 
     // Remove directories and anything that isn't in the rootPath.
     const filtered = files.filter(file =>
@@ -454,7 +460,8 @@ function installFmod(files) {
 //Test for movies files
 function testMovies(files, gameId) {
     // Make sure we're able to support this mod
-    const isMovie = files.find(file => path.extname(file).toLowerCase() === MOVIES_EXT) !== undefined;
+    const fileExt = util.getSafe(MODTYPES.MOVIES, ['fileExt'], ['.mp4']);
+    const isMovie = files.some(file => fileExt.includes(path.extname(file).toLowerCase()));
     let supported = (gameId === GAME_ID) && isMovie;
 
     return Promise.resolve({
@@ -465,10 +472,11 @@ function testMovies(files, gameId) {
 
 //Install movies files
 function installMovies(files) {
-    const modFile = files.find(file => path.extname(file).toLowerCase() === MOVIES_EXT);
+    const fileExt = util.getSafe(MODTYPES.MOVIES, ['fileExt'], ['.mp4']);
+    const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
     const idx = modFile.indexOf(path.basename(modFile));
     const rootPath = path.dirname(modFile);
-    const setModTypeInstruction = { type: 'setmodtype', value: MOVIES_ID };
+    const setModTypeInstruction = { type: 'setmodtype', value: MODTYPES.MOVIES.id };
 
     // Remove directories and anything that isn't in the rootPath.
     const filtered = files.filter(file =>
@@ -489,9 +497,9 @@ function installMovies(files) {
 //Test for config files
 function testConfig(files, gameId) {
     // Make sure we're able to support this mod
-    const isConfig = files.some(file => CONFIG_FILES.includes(path.basename(file).toLocaleLowerCase()));
-    const isIni = files.find(file => path.extname(file).toLowerCase() === CONFIG_EXT) !== undefined;
-    let supported = (gameId === GAME_ID) && isConfig && isIni;
+    const configs = util.getSafe(MODTYPES.CONFIG, ['files'], ['engine.ini', 'scalability.ini']);
+    const isConfig = files.some(file => configs.includes(path.basename(file).toLowerCase()));
+    let supported = (gameId === GAME_ID) && isConfig;
 
     // Test for a mod installer
     if (supported && files.find(file =>
@@ -509,10 +517,11 @@ function testConfig(files, gameId) {
 //Install config files
 function installConfig(files) {
     // The config files are expected to always be positioned in the mods directory we're going to disregard anything placed outside the root.
-    const modFile = files.find(file => path.extname(file).toLowerCase() === CONFIG_EXT);
+    const fileExt = util.getSafe(MODTYPES.CONFIG, ['fileExt'], ['.ini']);
+    const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
     const idx = modFile.indexOf(path.basename(modFile));
     const rootPath = path.dirname(modFile);
-    const setModTypeInstruction = { type: 'setmodtype', value: CONFIG_ID };
+    const setModTypeInstruction = { type: 'setmodtype', value: MODTYPES.CONFIG.id };
 
     // Remove directories and anything that isn't in the rootPath.
     const filtered = files.filter(file =>
@@ -532,7 +541,7 @@ function installConfig(files) {
 
 //Installer test for Fluffy Mod Manager files
 function testRoot(files, gameId) {
-    const isMod = files.some(file => path.basename(file) === ROOT_FILE);
+    const isMod = files.some(file => path.basename(file) === GAME_CODE_NAME);
     let supported = (gameId === GAME_ID) && isMod;
 
     return Promise.resolve({
@@ -543,10 +552,10 @@ function testRoot(files, gameId) {
 
 //Installer install Fluffy Mod Manger files
 function installRoot(files) {
-    const modFile = files.find(file => path.basename(file) === ROOT_FILE);
+    const modFile = files.find(file => path.basename(file) === GAME_CODE_NAME);
     const idx = modFile.indexOf(path.basename(modFile));
     const rootPath = path.dirname(modFile);
-    const setModTypeInstruction = { type: 'setmodtype', value: ROOT_ID };
+    const setModTypeInstruction = { type: 'setmodtype', value: MODTYPES.ROOT.id };
 
     // Remove directories and anything that isn't in the rootPath.
     const filtered = files.filter(file =>
@@ -568,7 +577,8 @@ function installRoot(files) {
 //Test for save files
 function testSave(files, gameId) {
     // Make sure we're able to support this mod
-    const isMod = files.find(file => path.extname(file).toLowerCase() === SAVE_EXT) !== undefined;
+    const fileExt = util.getSafe(MODTYPES.SAVE, ['fileExt'], ['.sav']);
+    const isMod = files.some(file => fileExt.includes(path.extname(file).toLowerCase()));
     let supported = (gameId === GAME_ID) && isMod;
 
     // Test for a mod installer
@@ -587,10 +597,11 @@ function testSave(files, gameId) {
 //Install save files
 function installSave(files) {
     // The config files are expected to always be positioned in the mods directory we're going to disregard anything placed outside the root.
-    const modFile = files.find(file => path.extname(file).toLowerCase() === SAVE_EXT);
+    const fileExt = util.getSafe(MODTYPES.SAVE, ['fileExt'], ['.sav']);
+    const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
     const idx = modFile.indexOf(path.basename(modFile));
     const rootPath = path.dirname(modFile);
-    const setModTypeInstruction = { type: 'setmodtype', value: SAVE_ID };
+    const setModTypeInstruction = { type: 'setmodtype', value: MODTYPES.SAVE.id };
 
     // Remove directories and anything that isn't in the rootPath.
     const filtered = files.filter(file =>
@@ -611,8 +622,7 @@ function installSave(files) {
 
 // DEFAULT MOD FALLBACK
 // Used if a mod cannot be defined
-
-function testFallback(files, gameId) {
+function testBinaries(files, gameId) {
     let supported = (gameId === GAME_ID);
 
     return Promise.resolve({
@@ -621,8 +631,8 @@ function testFallback(files, gameId) {
     });
 }
 
-function installFallback(files) {
-    const setModTypeInstruction = { type: 'setmodtype', value: BINARIES_ID };
+function installBinaries(files) {
+    const setModTypeInstruction = { type: 'setmodtype', value: MODTYPES.BINARIES.id };
 
     // Remove empty directories
     const filtered = files.filter(file =>
