@@ -144,7 +144,8 @@ function main(context) {
             steamAppId: GAMESTORES.STEAM.APP_ID,
             EpicAPPId: GAMESTORES.EPIC.APP_ID,
             customOpenModsPath: UNREALDATA.absModsPath || UNREALDATA.modsPath
-        }
+        },
+        requiresLauncher: requiresLauncher
     }
 
     // Register game
@@ -213,6 +214,28 @@ async function prepareForModding(discovery, api) {
     await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.CONFIG.installTargetPath));
     await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.SAVE.installTargetPath));
     return fs.ensureDirWritableAsync(path.join(discovery.path, UNREALDATA.modsPath));
+}
+
+async function requiresLauncher(gamePath, store) {
+    if (store === "steam") {
+        return Promise.resolve({
+            launcher: "steam",
+            addInfo: {
+                appId: GAMESTORES.STEAM.APP_ID,
+                parameters: [],
+                launchType: "gamestore",
+            },
+        });
+    } else if (store === "epic") {
+        return Promise.resolve({
+            launcher: "epic",
+            addInfo: {
+                appId: GAMESTORES.EPIC.APP_ID,
+            },
+        });
+    }
+    // return a void promise if nothing else
+    return Promise.resolve(undefined);
 }
 
 /* ======================= LOAD ORDER START ======================= */
