@@ -432,7 +432,7 @@ async function deserialize(context) {
  */
 function modTypePriority(priority) {
     return {
-        high: 25,
+        high: 26,
         low: 75,
     }[priority];
 }
