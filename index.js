@@ -53,7 +53,6 @@ const MODTYPES = {
         id: `${GAME_ID}-root`,
         name: "Root Game Folder",
         modTypePriority: "high",
-        installerOrderPriority: 35,
         installTargetPath: `{gamePath}`,
         testFunc: testRoot,
         installFunc: installRoot
@@ -62,7 +61,6 @@ const MODTYPES = {
         id: `${GAME_ID}-fmod`,
         name: "FMOD",
         modTypePriority: "high",
-        installerOrderPriority: 45,
         installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content', 'FMOD', 'Desktop')}`,
         fileExt: ['.bank'],
         testFunc: testFmod,
@@ -72,7 +70,6 @@ const MODTYPES = {
         id: `${GAME_ID}-movies`,
         name: "Movies",
         modTypePriority: "high",
-        installerOrderPriority: 55,
         installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content', 'Movies')}`,
         fileExt: ['.mp4'],
         testFunc: testMovies,
@@ -82,7 +79,6 @@ const MODTYPES = {
         id: `${GAME_ID}-vo-mod`,
         name: "VoiceOver (VO)",
         modTypePriority: "high",
-        installerOrderPriority: 65,
         installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content', 'VO_MOD')}`,
         fileExt: ['.ogg'],
         testFunc: testVO,
@@ -92,7 +88,6 @@ const MODTYPES = {
         id: `${GAME_ID}-config`,
         name: "Config (LocalAppData)",
         modTypePriority: "high",
-        installerOrderPriority: 75,
         installTargetPath: `{localAppData}\\${path.join(GAME_CODE_NAME, 'Saved', 'Config', 'Windows')}`,
         fileExt: ['.ini'],
         files: ["engine.ini", "scalability.ini"],
@@ -103,7 +98,6 @@ const MODTYPES = {
         id: `${GAME_ID}-save`,
         name: "Save Game",
         modTypePriority: "high",
-        installerOrderPriority: 85,
         fileExt: ['.sav'],
         installTargetPath: `{localAppData}\\${path.join(GAME_CODE_NAME, 'Saved', 'SaveGames')}`,
         testFunc: testSave,
@@ -113,7 +107,6 @@ const MODTYPES = {
         id: `${GAME_ID}-binaries`,
         name: "Binaries",
         modTypePriority: "high",
-        installerOrderPriority: 95,
         installTargetPath: `{gamePath}\\${EXEC_PATH}`,
         testFunc: testBinaries,
         installFunc: installBinaries
@@ -171,7 +164,8 @@ function main(context) {
         }, (game) => pathPattern(context.api, game, type.installTargetPath), () => Promise.resolve(false), { name: type.name });
 
         // Register mod installers
-        context.registerInstaller(type.id, type.installerOrderPriority, type.testFunc, type.installFunc);
+        const installerOrderPriority = util.getSafe(type, ['installerOrderPriority'], modTypePriority(type.modTypePriority) + idx);
+        context.registerInstaller(type.id, installerOrderPriority, type.testFunc, type.installFunc);
     });
 
     // Register load order page if available
