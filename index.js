@@ -450,6 +450,13 @@ function testFmod(files, gameId) {
     const isFMOD = files.some(file => fileExt.includes(path.extname(file).toLowerCase()));
     let supported = (gameId === GAME_ID) && isFMOD;
 
+    // Test for a mod installer
+    if (supported && files.find(file =>
+        (path.basename(file).toLowerCase() === 'moduleconfig.xml') &&
+        (path.basename(path.dirname(file)).toLowerCase() === 'fomod'))) {
+        supported = false;
+    }
+
     return Promise.resolve({
         supported,
         requiredFiles: [],
@@ -486,6 +493,13 @@ function testMovies(files, gameId) {
     const fileExt = util.getSafe(MODTYPES.MOVIES, ['fileExt'], ['.mp4']);
     const isMovie = files.some(file => fileExt.includes(path.extname(file).toLowerCase()));
     let supported = (gameId === GAME_ID) && isMovie;
+
+    // Test for a mod installer
+    if (supported && files.find(file =>
+        (path.basename(file).toLowerCase() === 'moduleconfig.xml') &&
+        (path.basename(path.dirname(file)).toLowerCase() === 'fomod'))) {
+        supported = false;
+    }
 
     return Promise.resolve({
         supported,
@@ -567,6 +581,13 @@ function testRoot(files, gameId) {
     const isMod = files.some(file => path.basename(file) === GAME_CODE_NAME);
     let supported = (gameId === GAME_ID) && isMod;
 
+    // Test for a mod installer
+    if (supported && files.find(file =>
+        (path.basename(file).toLowerCase() === 'moduleconfig.xml') &&
+        (path.basename(path.dirname(file)).toLowerCase() === 'fomod'))) {
+        supported = false;
+    }
+
     return Promise.resolve({
         supported,
         requiredFiles: [],
@@ -647,6 +668,13 @@ function installSave(files) {
 // Used if a mod cannot be defined
 function testBinaries(files, gameId) {
     let supported = (gameId === GAME_ID);
+
+    // Test for a mod installer
+    if (supported && files.find(file =>
+        (path.basename(file).toLowerCase() === 'moduleconfig.xml') &&
+        (path.basename(path.dirname(file)).toLowerCase() === 'fomod'))) {
+        supported = false;
+    }
 
     return Promise.resolve({
         supported,
