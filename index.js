@@ -78,11 +78,21 @@ const MODTYPES = {
         testFunc: testMovies,
         installFunc: installMovies
     },
+    VO_MOD: {
+        id: `${GAME_ID}-vo-mod`,
+        name: "VoiceOver (VO)",
+        modTypePriority: "high",
+        installerOrderPriority: 65,
+        installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content', 'VO_MOD')}`,
+        fileExt: ['.ogg'],
+        testFunc: testVO,
+        installFunc: installVO
+    },
     CONFIG: {
         id: `${GAME_ID}-config`,
         name: "Config (LocalAppData)",
         modTypePriority: "high",
-        installerOrderPriority: 65,
+        installerOrderPriority: 75,
         installTargetPath: `{localAppData}\\${path.join(GAME_CODE_NAME, 'Saved', 'Config', 'Windows')}`,
         fileExt: ['.ini'],
         files: ["engine.ini", "scalability.ini"],
@@ -93,7 +103,7 @@ const MODTYPES = {
         id: `${GAME_ID}-save`,
         name: "Save Game",
         modTypePriority: "high",
-        installerOrderPriority: 75,
+        installerOrderPriority: 85,
         fileExt: ['.sav'],
         installTargetPath: `{localAppData}\\${path.join(GAME_CODE_NAME, 'Saved', 'SaveGames')}`,
         testFunc: testSave,
@@ -103,7 +113,7 @@ const MODTYPES = {
         id: `${GAME_ID}-binaries`,
         name: "Binaries",
         modTypePriority: "high",
-        installerOrderPriority: 85,
+        installerOrderPriority: 95,
         installTargetPath: `{gamePath}\\${EXEC_PATH}`,
         testFunc: testBinaries,
         installFunc: installBinaries
@@ -211,6 +221,7 @@ function getExecutable(discoveryPath) {
 
 async function prepareForModding(discovery, api) {
     const game = { id: GAME_ID };
+    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.VO_MOD.installTargetPath));
     await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.CONFIG.installTargetPath));
     await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.SAVE.installTargetPath));
     return fs.ensureDirWritableAsync(path.join(discovery.path, UNREALDATA.modsPath));
@@ -527,6 +538,52 @@ function installMovies(files) {
             destination: path.join(file.substr(idx)),
         };
     });
+    instructions.push(setModTypeInstruction);
+    return Promise.resolve({ instructions });
+}
+
+// Test for VO files
+function testVO(files, gameId) {
+    // Make sure we're able to support this mod
+    const fileExt = util.getSafe(MODTYPES.VO_MOD, ['fileExt'], ['.ogg']);
+    const isMod = files.some(file => fileExt.includes(path.extname(file).toLowerCase()));
+    let supported = (gameId === GAME_ID) && isMod;
+
+    // Test for a mod installer
+    if (supported && files.find(file =>
+        (path.basename(file).toLowerCase() === 'moduleconfig.xml') &&
+        (path.basename(path.dirname(file)).toLowerCase() === 'fomod'))) {
+        supported = false;
+    }
+
+    return Promise.resolve({
+        supported,
+        requiredFiles: [],
+    });
+}
+
+// Install VO files
+function installVO(files) {
+    const fileExt = util.getSafe(MODTYPES.VO_MOD, ['fileExt'], ['.ogg']);
+    const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
+    const idx = modFile.indexOf(path.basename(modFile));
+    const rootPath = path.dirname(modFile);
+    const rootPrefix = rootPath === "." ? "" : rootPath + path.sep;
+    const setModTypeInstruction = { type: "setmodtype", value: MODTYPES.VO_MOD.id };
+
+    // Remove empty directories
+    const filtered = files.filter((file) =>
+        !file.endsWith(path.sep) && file.startsWith(rootPrefix)
+    );
+
+    const instructions = filtered.map((file) => {
+        return {
+            type: "copy",
+            source: file,
+            destination: path.join(file),
+        };
+    });
+
     instructions.push(setModTypeInstruction);
     return Promise.resolve({ instructions });
 }
