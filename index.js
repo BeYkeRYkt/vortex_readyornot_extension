@@ -122,137 +122,8 @@ const MODTYPES = {
     }
 }
 
-// LoadOrder
-const LO_FILE_NAME = 'loadOrder.json';
-
-function main(context) {
-
-    context.requireExtension('Unreal Engine Mod Installer');
-
-    // Game data
-    const game = {
-        id: GAME_ID,
-        name: GAME_NAME,
-        mergeMods: true,
-        queryPath: findGame,
-        requiresCleanup: true,
-        supportedTools: [],
-        queryModPath: () => '.',
-        compatible: {
-            unrealEngine: true
-        },
-        logo: GAME_ARTWORK,
-        executable: getExecutable,
-        requiredFiles: [
-            `${GAME_CODE_NAME}\\Content`
-        ],
-        setup: (discovery) => prepareForModding(discovery, context.api),
-        environment: {
-            SteamAPPId: GAMESTORES.STEAM.APP_ID,
-            EpicAPPId: GAMESTORES.EPIC.APP_ID
-        },
-        details: {
-            unrealEngine: UNREALDATA,
-            steamAppId: GAMESTORES.STEAM.APP_ID,
-            EpicAPPId: GAMESTORES.EPIC.APP_ID,
-            customOpenModsPath: UNREALDATA.absModsPath || UNREALDATA.modsPath
-        },
-        requiresLauncher: requiresLauncher
-    }
-
-    // Register game
-    context.registerGame(game);
-
-    const modTypes = Object.values(MODTYPES);
-    modTypes.forEach((type, idx) => {
-        // Register mod types
-        context.registerModType(type.id, modTypePriority(type.modTypePriority) + idx, (gameId) => {
-            var _a;
-            return (gameId === GAME_ID)
-                && !!((_a = context.api.getState().settings.gameMode.discovered[gameId]) === null || _a === void 0 ? void 0 : _a.path);
-        }, (game) => pathPattern(context.api, game, type.installTargetPath), () => Promise.resolve(false), { name: type.name });
-
-        // Register mod installers
-        const installerOrderPriority = util.getSafe(type, ['installerOrderPriority'], modTypePriority(type.modTypePriority) + idx);
-        context.registerInstaller(type.id, installerOrderPriority, type.testFunc, type.installFunc);
-    });
-
-    // Register load order page if available
-    if (UNREALDATA.loadOrder === true) {
-        context.registerLoadOrder({
-            gameId: GAME_ID,
-            validate: async () => Promise.resolve(undefined), // no validation needed
-            deserializeLoadOrder: async () => deserialize(context),
-            serializeLoadOrder: async (loadOrder) => serialize(context, loadOrder),
-            toggleableEntries: false,
-            usageInstructions: `Drag and drop the mods on the left to change the order in which they load. RoN loads mods in alphanumerical order, so Vortex prefixes `
-                + 'the folder names with "AAA, AAB, AAC, ..." to ensure they load in the order you set here. '
-                + 'The number in the left column represents the overwrite order. The changes from mods with higher numbers will take priority over other mods which make similar edits.',
-        });
-    }
-}
-
-function findGame() {
-    const appIds = Object.values(GAMESTORES)
-        .map(store => store.APP_ID)
-        .filter(id => id && id.length > 0);
-    return util.GameStoreHelper.findByAppId(appIds)
-        .then(game => game.gamePath);
-}
-
-// Get correct shipping executable for game version
-function getExecutable(discoveryPath) {
-    const isCorrectExec = (exec) => {
-        try {
-            fs.statSync(path.join(discoveryPath, exec));
-            return true;
-        }
-        catch (err) {
-            return false;
-        }
-    };
-    let exe_path = GAMESTORES.STEAM.EXE_PATH; // Use steam exe path for default
-    const exePaths = Object.values(GAMESTORES).map(store => store.EXE_PATH);
-    for (const p of exePaths) {
-        if (isCorrectExec(p)) {
-            exe_path = p;
-            break;
-        }
-    };
-    return exe_path;
-}
-
-async function prepareForModding(discovery, api) {
-    const game = { id: GAME_ID };
-    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.VO_MOD_FILES.installTargetPath));
-    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.CONFIG.installTargetPath));
-    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.SAVE.installTargetPath));
-    return fs.ensureDirWritableAsync(path.join(discovery.path, UNREALDATA.modsPath));
-}
-
-async function requiresLauncher(gamePath, store) {
-    if (store === "steam") {
-        return Promise.resolve({
-            launcher: "steam",
-            addInfo: {
-                appId: GAMESTORES.STEAM.APP_ID,
-                parameters: [],
-                launchType: "gamestore",
-            },
-        });
-    } else if (store === "epic") {
-        return Promise.resolve({
-            launcher: "epic",
-            addInfo: {
-                appId: GAMESTORES.EPIC.APP_ID,
-            },
-        });
-    }
-    // return a void promise if nothing else
-    return Promise.resolve(undefined);
-}
-
 /* ======================= LOAD ORDER START ======================= */
+const LO_FILE_NAME = 'loadOrder.json';
 
 function generateProps(context, profileId) {
     const api = context.api;
@@ -457,7 +328,7 @@ function pathPattern(api, game, pattern) {
     });
 }
 
-//Test for fmod files
+// Installer test for FMOD files
 function testFmod(files, gameId) {
     // Make sure we're able to support this mod
     const fileExt = util.getSafe(MODTYPES.FMOD, ['fileExt'], ['.bank']);
@@ -477,7 +348,7 @@ function testFmod(files, gameId) {
     });
 }
 
-//Install fmod files
+// Installer install for FMOD files
 function installFmod(files) {
     const fileExt = util.getSafe(MODTYPES.FMOD, ['fileExt'], ['.bank']);
     const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
@@ -501,7 +372,7 @@ function installFmod(files) {
     return Promise.resolve({ instructions });
 }
 
-//Test for movies files
+// Installer test for Movies files
 function testMovies(files, gameId) {
     // Make sure we're able to support this mod
     const fileExt = util.getSafe(MODTYPES.MOVIES, ['fileExt'], ['.mp4']);
@@ -521,7 +392,7 @@ function testMovies(files, gameId) {
     });
 }
 
-//Install movies files
+// Installer install for Movies files
 function installMovies(files) {
     const fileExt = util.getSafe(MODTYPES.MOVIES, ['fileExt'], ['.mp4']);
     const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
@@ -592,7 +463,7 @@ function installVOFolder(files) {
     return Promise.resolve({ instructions });
 }
 
-// Test for VO files
+// Installer test for VO files
 function testVOFiles(files, gameId) {
     // Make sure we're able to support this mod
     const fileExt = util.getSafe(MODTYPES.VO_MOD_FILES, ['fileExt'], ['.ogg']);
@@ -612,7 +483,7 @@ function testVOFiles(files, gameId) {
     });
 }
 
-// Install VO files
+// Installer install for VO files
 function installVOFiles(files) {
     const fileExt = util.getSafe(MODTYPES.VO_MOD_FILES, ['fileExt'], ['.ogg']);
     const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
@@ -638,7 +509,7 @@ function installVOFiles(files) {
     return Promise.resolve({ instructions });
 }
 
-//Test for config files
+// Installer test for Config files
 function testConfig(files, gameId) {
     // Make sure we're able to support this mod
     const configs = util.getSafe(MODTYPES.CONFIG, ['files'], ['engine.ini', 'scalability.ini']);
@@ -658,7 +529,7 @@ function testConfig(files, gameId) {
     });
 }
 
-//Install config files
+// Installer install for Config files
 function installConfig(files) {
     // The config files are expected to always be positioned in the mods directory we're going to disregard anything placed outside the root.
     const fileExt = util.getSafe(MODTYPES.CONFIG, ['fileExt'], ['.ini']);
@@ -683,7 +554,7 @@ function installConfig(files) {
     return Promise.resolve({ instructions });
 }
 
-//Installer test for Fluffy Mod Manager files
+// Installer test for Root folder files
 function testRoot(files, gameId) {
     const isMod = files.some(file => path.basename(file) === GAME_CODE_NAME);
     let supported = (gameId === GAME_ID) && isMod;
@@ -701,7 +572,7 @@ function testRoot(files, gameId) {
     });
 }
 
-//Installer install Fluffy Mod Manger files
+// Installer install Root folder files
 function installRoot(files) {
     const modFile = files.find(file => path.basename(file) === GAME_CODE_NAME);
     const idx = modFile.indexOf(path.basename(modFile));
@@ -725,7 +596,7 @@ function installRoot(files) {
     return Promise.resolve({ instructions });
 }
 
-//Test for save files
+// Installer test for Save files
 function testSave(files, gameId) {
     // Make sure we're able to support this mod
     const fileExt = util.getSafe(MODTYPES.SAVE, ['fileExt'], ['.sav']);
@@ -745,7 +616,7 @@ function testSave(files, gameId) {
     });
 }
 
-//Install save files
+// Installer install for Save files
 function installSave(files) {
     // The config files are expected to always be positioned in the mods directory we're going to disregard anything placed outside the root.
     const fileExt = util.getSafe(MODTYPES.SAVE, ['fileExt'], ['.sav']);
@@ -773,6 +644,8 @@ function installSave(files) {
 
 // DEFAULT MOD FALLBACK
 // Used if a mod cannot be defined
+
+// Installer test for Binaries files
 function testBinaries(files, gameId) {
     let supported = (gameId === GAME_ID);
 
@@ -789,6 +662,7 @@ function testBinaries(files, gameId) {
     });
 }
 
+// Installer install for Binaries files
 function installBinaries(files) {
     const setModTypeInstruction = { type: 'setmodtype', value: MODTYPES.BINARIES.id };
 
@@ -806,6 +680,132 @@ function installBinaries(files) {
     });
     instructions.push(setModTypeInstruction);
     return Promise.resolve({ instructions });
+}
+
+function findGame() {
+    const appIds = Object.values(GAMESTORES)
+        .map(store => store.APP_ID)
+        .filter(id => id && id.length > 0);
+    return util.GameStoreHelper.findByAppId(appIds)
+        .then(game => game.gamePath);
+}
+
+// Get correct shipping executable for game version
+function getExecutable(discoveryPath) {
+    const isCorrectExec = (exec) => {
+        try {
+            fs.statSync(path.join(discoveryPath, exec));
+            return true;
+        }
+        catch (err) {
+            return false;
+        }
+    };
+    let exe_path = GAMESTORES.STEAM.EXE_PATH; // Use steam exe path for default
+    const exePaths = Object.values(GAMESTORES).map(store => store.EXE_PATH);
+    for (const p of exePaths) {
+        if (isCorrectExec(p)) {
+            exe_path = p;
+            break;
+        }
+    };
+    return exe_path;
+}
+
+async function prepareForModding(discovery, api) {
+    const game = { id: GAME_ID };
+    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.VO_MOD_FILES.installTargetPath));
+    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.CONFIG.installTargetPath));
+    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.SAVE.installTargetPath));
+    return fs.ensureDirWritableAsync(path.join(discovery.path, UNREALDATA.modsPath));
+}
+
+async function requiresLauncher(gamePath, store) {
+    if (store === "steam") {
+        return Promise.resolve({
+            launcher: "steam",
+            addInfo: {
+                appId: GAMESTORES.STEAM.APP_ID,
+                parameters: [],
+                launchType: "gamestore",
+            },
+        });
+    } else if (store === "epic") {
+        return Promise.resolve({
+            launcher: "epic",
+            addInfo: {
+                appId: GAMESTORES.EPIC.APP_ID,
+            },
+        });
+    }
+    // return a void promise if nothing else
+    return Promise.resolve(undefined);
+}
+
+function main(context) {
+    context.requireExtension('Unreal Engine Mod Installer');
+
+    // Game data
+    const game = {
+        id: GAME_ID,
+        name: GAME_NAME,
+        mergeMods: true,
+        queryPath: findGame,
+        requiresCleanup: true,
+        supportedTools: [],
+        queryModPath: () => '.',
+        compatible: {
+            unrealEngine: true
+        },
+        logo: GAME_ARTWORK,
+        executable: getExecutable,
+        requiredFiles: [
+            `${GAME_CODE_NAME}\\Content`
+        ],
+        setup: (discovery) => prepareForModding(discovery, context.api),
+        environment: {
+            SteamAPPId: GAMESTORES.STEAM.APP_ID,
+            EpicAPPId: GAMESTORES.EPIC.APP_ID
+        },
+        details: {
+            unrealEngine: UNREALDATA,
+            steamAppId: GAMESTORES.STEAM.APP_ID,
+            EpicAPPId: GAMESTORES.EPIC.APP_ID,
+            customOpenModsPath: UNREALDATA.absModsPath || UNREALDATA.modsPath
+        },
+        requiresLauncher: requiresLauncher
+    }
+
+    // Register game
+    context.registerGame(game);
+
+    const modTypes = Object.values(MODTYPES);
+    modTypes.forEach((type, idx) => {
+        // Register mod types
+        context.registerModType(type.id, modTypePriority(type.modTypePriority) + idx, (gameId) => {
+            var _a;
+            return (gameId === GAME_ID)
+                && !!((_a = context.api.getState().settings.gameMode.discovered[gameId]) === null || _a === void 0 ? void 0 : _a.path);
+        }, (game) => pathPattern(context.api, game, type.installTargetPath), () => Promise.resolve(false), { name: type.name });
+
+        // Register mod installers
+        const installerOrderPriority = util.getSafe(type, ['installerOrderPriority'], modTypePriority(type.modTypePriority) + idx);
+        context.registerInstaller(type.id, installerOrderPriority, type.testFunc, type.installFunc);
+    });
+
+    // Register load order page if available
+    if (UNREALDATA.loadOrder === true) {
+        context.registerLoadOrder({
+            gameId: GAME_ID,
+            validate: async () => Promise.resolve(undefined), // no validation needed
+            deserializeLoadOrder: async () => deserialize(context),
+            serializeLoadOrder: async (loadOrder) => serialize(context, loadOrder),
+            toggleableEntries: false,
+            usageInstructions: `Drag and drop the mods on the left to change the order in which they load. RoN loads mods in alphanumerical order, so Vortex prefixes `
+                + 'the folder names with "AAA, AAB, AAC, ..." to ensure they load in the order you set here. '
+                + 'The number in the left column represents the overwrite order. The changes from mods with higher numbers will take priority over other mods which make similar edits.',
+        });
+    }
 }
 
 module.exports = {
