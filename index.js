@@ -75,6 +75,15 @@ const MODTYPES = {
         testFunc: testMovies,
         installFunc: installMovies
     },
+    VO_MOD_FOLDER: {
+        id: `${GAME_ID}-vo-mod-folder`,
+        name: "VoiceOver (VO) Folder",
+        modTypePriority: "high",
+        installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content')}`,
+        files: ["VO_MOD"],
+        testFunc: testVOFolder,
+        installFunc: installVOFolder
+    },
     VO_MOD: {
         id: `${GAME_ID}-vo-mod`,
         name: "VoiceOver (VO)",
@@ -533,6 +542,53 @@ function installMovies(files) {
         };
     });
     instructions.push(setModTypeInstruction);
+    return Promise.resolve({ instructions });
+}
+
+// Installer test for VO folder
+function testVOFolder(files, gameId) {
+    const folders = util.getSafe(MODTYPES.VO_MOD_FOLDER, ['files'], ['VO_MOD']);
+    const targets = folders.map(f => f.toLowerCase());
+    const isMod = files.some(file => targets.includes(path.basename(file).toLowerCase()));
+    let supported = (gameId === GAME_ID) && isMod;
+
+    // Test for a mod installer
+    if (supported && files.find(file =>
+        (path.basename(file).toLowerCase() === 'moduleconfig.xml') &&
+        (path.basename(path.dirname(file)).toLowerCase() === 'fomod'))) {
+        supported = false;
+    }
+
+    return Promise.resolve({
+        supported,
+        requiredFiles: [],
+    });
+}
+
+// Installer install for VO folder
+function installVOFolder(files) {
+    const folders = util.getSafe(MODTYPES.VO_MOD_FOLDER, ['files'], ['VO_MOD']);
+    const targets = folders.map(f => f.toLowerCase());
+    const modFile = files.find(file => targets.includes(path.basename(file).toLowerCase()));
+    const idx = modFile.indexOf(path.basename(modFile));
+    const rootPath = path.dirname(modFile);
+    const rootPrefix = rootPath === "." ? "" : rootPath + path.sep;
+    const setModTypeInstruction = { type: "setmodtype", value: MODTYPES.VO_MOD_FOLDER.id };
+
+    // Remove directories and anything that isn't in the rootPath.
+    const filtered = files.filter(
+        (file) => !file.endsWith(path.sep) && file.startsWith(rootPrefix)
+    );
+
+    const instructions = filtered.map((file) => {
+        return {
+            type: "copy",
+            source: file,
+            destination: path.join(file.substr(idx)),
+        };
+    });
+    instructions.push(setModTypeInstruction);
+
     return Promise.resolve({ instructions });
 }
 
