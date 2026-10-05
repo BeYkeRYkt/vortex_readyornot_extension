@@ -84,14 +84,14 @@ const MODTYPES = {
         testFunc: testVOFolder,
         installFunc: installVOFolder
     },
-    VO_MOD: {
-        id: `${GAME_ID}-vo-mod`,
-        name: "VoiceOver (VO)",
+    VO_MOD_FILES: {
+        id: `${GAME_ID}-vo-mod-files`,
+        name: "VoiceOver (VO) Files",
         modTypePriority: "high",
         installTargetPath: `{gamePath}\\${path.join(GAME_CODE_NAME, 'Content', 'VO_MOD')}`,
         fileExt: ['.ogg'],
-        testFunc: testVO,
-        installFunc: installVO
+        testFunc: testVOFiles,
+        installFunc: installVOFiles
     },
     CONFIG: {
         id: `${GAME_ID}-config`,
@@ -224,7 +224,7 @@ function getExecutable(discoveryPath) {
 
 async function prepareForModding(discovery, api) {
     const game = { id: GAME_ID };
-    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.VO_MOD.installTargetPath));
+    await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.VO_MOD_FILES.installTargetPath));
     await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.CONFIG.installTargetPath));
     await fs.ensureDirWritableAsync(pathPattern(api, game, MODTYPES.SAVE.installTargetPath));
     return fs.ensureDirWritableAsync(path.join(discovery.path, UNREALDATA.modsPath));
@@ -593,9 +593,9 @@ function installVOFolder(files) {
 }
 
 // Test for VO files
-function testVO(files, gameId) {
+function testVOFiles(files, gameId) {
     // Make sure we're able to support this mod
-    const fileExt = util.getSafe(MODTYPES.VO_MOD, ['fileExt'], ['.ogg']);
+    const fileExt = util.getSafe(MODTYPES.VO_MOD_FILES, ['fileExt'], ['.ogg']);
     const isMod = files.some(file => fileExt.includes(path.extname(file).toLowerCase()));
     let supported = (gameId === GAME_ID) && isMod;
 
@@ -613,13 +613,13 @@ function testVO(files, gameId) {
 }
 
 // Install VO files
-function installVO(files) {
-    const fileExt = util.getSafe(MODTYPES.VO_MOD, ['fileExt'], ['.ogg']);
+function installVOFiles(files) {
+    const fileExt = util.getSafe(MODTYPES.VO_MOD_FILES, ['fileExt'], ['.ogg']);
     const modFile = files.find(file => fileExt.includes(path.extname(file).toLowerCase()));
     const idx = modFile.indexOf(path.basename(modFile));
     const rootPath = path.dirname(modFile);
     const rootPrefix = rootPath === "." ? "" : rootPath + path.sep;
-    const setModTypeInstruction = { type: "setmodtype", value: MODTYPES.VO_MOD.id };
+    const setModTypeInstruction = { type: "setmodtype", value: MODTYPES.VO_MOD_FILES.id };
 
     // Remove empty directories
     const filtered = files.filter((file) =>
