@@ -118,7 +118,10 @@ const LO_FILE_NAME = 'loadOrder.json';
 
 function main(context) {
 
-    context.requireExtension('Unreal Engine Mod Installer');
+    // NB: the mod is published as "Unreal Engine Mod Installer" but its actual
+    // manifest `info.json` says "Unreal Engine Game Library". Check published
+    // archive from <https://www.nexusmods.com/site/mods/153>.
+    context.requireExtension('Unreal Engine Game Library');
 
     // Game data
     const game = {
